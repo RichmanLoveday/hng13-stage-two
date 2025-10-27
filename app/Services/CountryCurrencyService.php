@@ -79,24 +79,24 @@ class CountryCurrencyService
                 $currencies = $item['currencies'] ?? [];
 
                 //? Validation (only name and population are required)
-                // if (empty($name)) {
-                //     $validationDetails['name'] = 'name is required';
-                // }
-                // if (empty($population)) {
-                //     $validationDetails['population'] = 'population is required';
-                // }
+                if (empty($name)) {
+                    $validationDetails['name'] = 'name is required';
+                }
+                if (empty($population)) {
+                    $validationDetails['population'] = 'population is required';
+                }
 
-                // if (!empty($validationDetails)) {
-
-                //     DB::rollBack();
-                //     return [
-                //         "success" => false,
-                //         "message" => "Validation failed",
-                //         "type" => "validation",
-                //         "details" => $validationDetails,
-                //         "code" => 400,
-                //     ];
-                // }
+                if (!empty($validationDetails)) {
+                    continue;
+                    // DB::rollBack();
+                    // return [
+                    //     "success" => false,
+                    //     "message" => "Validation failed",
+                    //     "type" => "validation",
+                    //     "details" => $validationDetails,
+                    //     "code" => 400,
+                    // ];
+                }
 
 
                 //? check if currencies is an array and is greater than one
