@@ -20,6 +20,8 @@ class CountryCurrency extends Model
         'flag_url',
         'last_refreshed_at'
     ];
+
+
     protected $casts = [
         'population' => 'integer',
         'exchange_rate' => 'decimal:6',

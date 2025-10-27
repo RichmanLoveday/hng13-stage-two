@@ -39,5 +39,6 @@ return [
     'country' =>  env('COUNTRIES_API'),
     'exchange_rate' => env('EXCHANGE_RATE_API'),
     'api_timeout' => env('API_TIMEOUT', 15),
+    "image_path" => env("IMAGE_PATH"),
 
 ];

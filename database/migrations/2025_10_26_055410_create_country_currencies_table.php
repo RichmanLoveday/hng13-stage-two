@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string("region")->nullable();
             $table->string("flag_url")->nullable();
             $table->integer("population");
-            $table->string("country_code")->nullable();
+            // $table->string("country_code")->nullable();
             $table->string('currency_code')->nullable();
             $table->decimal('exchange_rate', 16, 6)->nullable();
             $table->decimal("estimated_gdp", 16, 4)->nullable();

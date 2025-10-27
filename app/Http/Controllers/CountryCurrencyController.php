@@ -13,77 +13,109 @@ class CountryCurrencyController extends Controller
     {
         $res = $service->refresh();
 
-        if (! $res['success']) {
+        if (!$res['success']) {
             if (isset($res['api']) && in_array($res['api'], ['countries', 'exchange'])) {
                 return response()->json([
                     'error' => 'External data source unavailable',
                     'details' => "Could not fetch data from {$res['api']}"
-                ], 503);
+                ], $res['code']);
             }
 
-            return response()->json(['error' => $res['message'] ?? 'Refresh failed'], 500);
+            //? check for validation
+            if (isset($res['type']) && $res['type'] === 'validation') {
+                return response()->json([
+                    'error' => $res['message'],
+                    'details' => $res['details'],
+                ], $res['code']);
+            }
+
+            return response()->json([
+                'error' => $res['message'] ?? 'Refresh failed'
+            ], $res['code']);
         }
 
-        return response()->json(['message' => $res['message'], 'last_refreshed_at' => $res['last_refreshed_at']]);
-    }
-
-    public function allCountries(Request $request)
-    {
-        $query = CountryCurrency::query();
-
-        if ($request->filled('region')) {
-            $query->where('region', $request->get('region'));
-        }
-
-        if ($request->filled('currency')) {
-            $query->where('currency_code', $request->get('currency'));
-        }
-
-        // sorting
-        if ($request->get('sort') === 'gdp_desc') {
-            $query->orderByDesc('estimated_gdp');
-        } elseif ($request->get('sort') === 'gdp_asc') {
-            $query->orderBy('estimated_gdp');
-        }
-
-        $countries = $query->get();
-
-        return response()->json($countries);
-    }
-
-    public function show($name)
-    {
-        $country = CountryCurrency::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->first();
-        if (! $country) {
-            return response()->json(['error' => 'Country not found'], 404);
-        }
-        return response()->json($country);
-    }
-
-    public function destroy($name)
-    {
-        $country = CountryCurrency::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->first();
-        if (! $country) {
-            return response()->json(['error' => 'Country not found'], 404);
-        }
-        $country->delete();
-        return response()->json(['message' => 'Deleted']);
-    }
-
-    public function status()
-    {
-        $total = CountryCurrency::count();
-        $last = CountryCurrency::orderByDesc('last_refreshed_at')->value('last_refreshed_at');
 
         return response()->json([
-            'total_countries' => $total,
-            'last_refreshed_at' => $last ? (new \Carbon\Carbon($last))->toIso8601String() : null,
-        ]);
+            'message' => $res['message'],
+            'last_refreshed_at' => $res['last_refreshed_at']
+        ], $res['code']);
     }
 
-    public function image()
+    public function allCountries(Request $request, CountryCurrencyService $service)
     {
-        $path = storage_path('app/public/cache/summary.png');
+        $res = $service->getAllCountries($request->all());
+
+        if ($res['success']) {
+            return response()->json(
+                $res['countries'],
+                $res['code']
+            );
+        }
+
+        return response()->json([
+            'error' => $res['message']
+        ], $res['code']);
+    }
+
+
+    public function show(string $name, CountryCurrencyService $service)
+    {
+        $res = $service->findSingleCountry($name);
+        if (!$res["success"]) {
+            return response()->json(
+                ["error" => $res['message']],
+                $res['code']
+            );
+        }
+
+        return response()->json(
+            $res['country'],
+            $res['code']
+        );
+    }
+
+    public function destroy(string $name, CountryCurrencyService $service)
+    {
+        $res = $service->deleteCountry($name);
+        if (!$res["success"]) {
+            return response()->json(
+                ["error" => $res['message']],
+                $res['code']
+            );
+        }
+
+        return response()->json(
+            ["message" => $res['message']],
+            $res['code']
+        );
+    }
+
+
+    public function status(CountryCurrencyService $service)
+    {
+        $res = $service->status();
+
+        if ($res["success"]) {
+            return response()->json(
+                [
+                    "total_countries" => $res['total_countries'],
+                    "last_refreshed_at" => $res['last_refreshed_at'],
+                ],
+                $res['code']
+            );
+        }
+
+        return response()->json(
+            ["error" => $res['message']],
+            $res['code']
+        );
+    }
+
+
+    public function image(CountryCurrencyService $service)
+    {
+        $path = storage_path($service->imagePath);
+        // dd($path);
         if (! file_exists($path)) {
             return response()->json(['error' => 'Summary image not found'], 404);
         }
