@@ -1,105 +1,153 @@
-# 🌍 Country Data Refresh Service
+# Wallet Service API
 
-A Laravel-based backend service that periodically fetches, validates, and updates country and currency information from external APIs (like RESTCountries and ExchangeRate).  
-It stores results in your database, calculates estimated GDP, and provides a clean API for further integration.
+A backend-only Wallet Service built with Laravel 11, enabling users to:
 
----
+- Deposit money using Paystack
+- Manage wallet balances
+- View transaction history
+- Transfer funds between wallets
+- Access the API using JWT (Google sign-in) or API keys
 
-## 🚀 Features
+## Table of Contents
 
-- Fetches and validates country data from a public API  
-- Integrates with exchange rate APIs for currency conversion  
-- Calculates estimated GDP using population and exchange rates  
-- Upserts records intelligently to avoid duplication  
-- Rolls back transactions on validation or fetch failure  
-- Generates summary reports with last refreshed timestamp  
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Environment Variables](#environment-variables)
+- [Authentication](#authentication)
+- [API Endpoints](#api-endpoints)
+- [Security Considerations](#security-considerations)
+- [Error Handling & Idempotency](#error-handling--idempotency)
+- [License](#license)
 
----
+## Features
 
-## 🧰 Tech Stack
+- Google OAuth2 JWT authentication
+- Service-to-service API key access with permissions and expiry
+- Wallet deposit via Paystack (with mandatory webhook handling)
+- Wallet-to-wallet transfers with atomic DB transactions
+- Wallet balance retrieval and transaction history
+- Maximum 5 active API keys per user
+- Permission-based API key access
 
-- **Laravel 10+**
-- **PHP 8.2+**
-- **MySQL / MariaDB**
-- **Composer**
-- **Guzzle HTTP Client** (for API calls)
-- **Carbon** (for date/time operations)
+## Requirements
 
----
+- PHP 8.2+
+- Laravel 11
+- MySQL / MariaDB
+- Composer
+- Paystack account
 
-## ⚙️ Installation
+## Installation
 
-### 1️⃣ Clone the Repository
+Clone the repository:
+
 ```bash
-git clone https://github.com/your-username/country-data-refresh.git
-cd country-data-refresh
+git clone <your-repo-url>
+cd hng-wallet-service
 ```
 
-### 1️⃣ Install Dependencies
+Install dependencies:
+
 ```bash
 composer install
 ```
 
-### Configure Environment
+Copy `.env.example` and configure:
+
 ```bash
 cp .env.example .env
 ```
-Then edit .env to include your database details:
 
-```env
-APP_NAME=CountryRefreshService
-APP_ENV=local
-APP_KEY=
-APP_DEBUG=true
-APP_URL=http://localhost
+Generate application key:
 
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=country_refresh
-DB_USERNAME=root
-DB_PASSWORD=
+```bash
+php artisan key:generate
 ```
 
-### Run migration
+Generate JWT secret:
+
+```bash
+php artisan jwt:secret
+```
+
+Run migrations:
+
 ```bash
 php artisan migrate
 ```
 
-### Usage
+Serve the application locally:
+
 ```bash
 php artisan serve
 ```
 
-Refresh Country and Exchange Data
-You can trigger the refresh via:
-```bash
-php artisan tinker
->>> app(App\Services\CountryService::class)->refresh();
-```
-Or through an API endpoint if exposed (e.g.):
-```bash
-api/countries/refresh
+## Environment Variables
+
+```env
+APP_NAME=WalletService
+APP_URL=http://localhost:8000
+
+PAYSTACK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxx
+PAYSTACK_PUBLIC_KEY=pk_test_xxxxxxxxxxxxxxxxx
+
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/auth/google/callback
 ```
 
-Successful response:
-```json
-{
-  "message": "Refreshed successfully",
-  "last_refreshed_at": "2025-10-27T12:30:00Z",
-}
-```
+## Authentication
 
-### Folder Structure
-```pgsql
-app/
- ├── Models/
- │   └── CountryCurrency.php
- ├── Services/
- │   └── CountryCurrencyService.php
-database/
- ├── migrations/
- └── seeders/
-routes/
- └── api.php
- ```
+### Google Sign-In (JWT)
+
+**Routes:**
+- `GET /api/auth/google/redirect`
+- `GET /api/auth/google/callback`
+
+Returns a JWT token for authenticated users.
+
+### API Keys (Service-to-Service)
+
+**Routes:**
+- `POST /api/keys/create`
+- `POST /api/keys/rollover`
+
+API keys have permissions (read, deposit, transfer) and expiry. Maximum 5 active keys per user.
+
+## API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/wallet/balance` | GET | JWT / API Key (read) | Retrieve wallet balance |
+| `/wallet/deposit` | POST | JWT / API Key (deposit) | Initialize Paystack deposit |
+| `/wallet/paystack/webhook` | POST | None | Paystack webhook to confirm deposit |
+| `/wallet/deposit/{reference}/status` | GET | JWT / API Key (read) | Check deposit status (no wallet credit) |
+| `/wallet/transfer` | POST | JWT / API Key (transfer) | Transfer funds to another wallet |
+| `/wallet/transactions` | GET | JWT / API Key (read) | Get transaction history |
+
+## Security Considerations
+
+- Never expose secret keys
+- Webhooks are validated before crediting wallets
+- Transfers are rejected for insufficient balance
+- API keys without permissions are rejected
+- Maximum 5 active API keys per user; expired keys are rejected automatically
+
+## Error Handling & Idempotency
+
+- Unique Paystack reference required per deposit
+- Webhooks are idempotent to prevent double-credit
+- Transfers are atomic (no partial deduction)
+- Clear error responses for:
+  - Insufficient balance
+  - Invalid API key
+  - Expired API key
+  - Missing permissions
+
+## Notes
+
+- Frontend/UI is out of scope; API-only
+- Manual bank transfers are not supported
+- Paystack is the only payment provider integrated
+
