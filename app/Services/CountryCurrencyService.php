@@ -37,7 +37,6 @@ class CountryCurrencyService
             }
 
 
-
             //? fetch exchange rate api
             $exchangeResponse = $this->fetchExchangeRateApi();
             if (!$exchangeResponse['success']) {

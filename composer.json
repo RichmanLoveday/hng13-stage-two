@@ -9,7 +9,10 @@
         "php": "^8.2",
         "laravel/framework": "^11.31",
         "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^2.9"
+        "laravel/socialite": "^5.24",
+        "laravel/tinker": "^2.9",
+        "tymon/jwt-auth": "^2.2",
+        "yabacon/paystack-php": "^2.2"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
