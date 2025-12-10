@@ -1,0 +1,205 @@
+openapi: 3.0.0
+info:
+  title: HNG Wallet Service API
+  description: Wallet service with Paystack, JWT & API Keys
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api
+  - url: https://your-ngrok-url/api
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+tags:
+  - name: Authentication
+  - name: API Keys
+  - name: Wallet
+  - name: Transactions
+
+paths:
+
+  /auth/google/redirect:
+    get:
+      tags: [Authentication]
+      summary: Redirect to Google login
+      responses:
+        '302':
+          description: Redirect to Google
+
+  /auth/google/callback:
+    get:
+      tags: [Authentication]
+      summary: Google login callback
+      responses:
+        '200':
+          description: JWT Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+
+  /keys/create:
+    post:
+      tags: [API Keys]
+      summary: Create API Key
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, permissions, expiry]
+              properties:
+                name:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                    enum: [read, deposit, transfer]
+                expiry:
+                  type: string
+                  example: 1D
+      responses:
+        '200':
+          description: API Key created
+
+  /keys/rollover:
+    post:
+      tags: [API Keys]
+      summary: Rollover expired API Key
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expired_key_id, expiry]
+              properties:
+                expired_key_id:
+                  type: string
+                expiry:
+                  type: string
+                  example: 1M
+      responses:
+        '200':
+          description: New API key generated
+
+  /wallet/balance:
+    get:
+      tags: [Wallet]
+      summary: Get wallet balance
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Wallet balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: number
+
+  /wallet/deposit:
+    post:
+      tags: [Wallet]
+      summary: Initialize Paystack deposit
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required: [amount]
+              properties:
+                amount:
+                  type: integer
+                  example: 5000
+      responses:
+        '200':
+          description: Paystack checkout URL
+
+  /wallet/deposit/{reference}/status:
+    get:
+      tags: [Wallet]
+      summary: Verify deposit status
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction status
+
+  /wallet/transfer:
+    post:
+      tags: [Wallet]
+      summary: Wallet-to-wallet transfer
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required: [wallet_number, amount]
+              properties:
+                wallet_number:
+                  type: string
+                amount:
+                  type: integer
+                  example: 3000
+      responses:
+        '200':
+          description: Transfer successful
+
+  /wallet/transactions:
+    get:
+      tags: [Transactions]
+      summary: Transaction history
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Transaction list
+
+  /wallet/paystack/webhook:
+    post:
+      tags: [Wallet]
+      summary: Paystack webhook
+      responses:
+        '200':
+          description: Webhook received

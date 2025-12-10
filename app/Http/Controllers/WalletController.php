@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transaction;
+use App\Models\Wallet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -23,7 +25,7 @@ class WalletController extends Controller
     public function balance(Request $request)
     {
         // check if user is authenticated
-        $user = JWTAuth::parseToken()->authenticate();
+        $user = $request->user();
         // dd($user);
 
         // check if user owns a wallet
@@ -54,7 +56,7 @@ class WalletController extends Controller
 
         try {
             // check if user is authenticated
-            $user = Auth::user();
+            $user = $request->user();
             // dd($user);
 
             if (!$user || !$user->wallet) {
@@ -196,7 +198,91 @@ class WalletController extends Controller
     }
 
 
-    public function transfer(Request $request) {}
+    public function transfer(Request $request)
+    {
+        $request->validate([
+            'amount' => 'required|numeric|min:100',
+            'wallet_number' => 'required|string|exists:wallets,wallet_number',
+        ]);
+
+        // dd($request->all());
+
+
+        //? sender
+        $sender = $request->user();
+        $senderWallet = $sender->wallet;
+
+        if ($senderWallet->balance < $request->amount) {
+            return response()->json([
+                'status' => false,
+                'error' => 'Insufficient funds',
+            ], 400);
+        }
+
+        $receiverWallet = Wallet::where('wallet_number', $request->wallet_number)
+            ->first();
+
+
+        // retrict transfer to self
+        if ($receiverWallet->id === $senderWallet->id) {
+            return response()->json([
+                'status' => false,
+                'error' => 'You cannot transfer to your own wallet',
+            ], 400);
+        }
+
+
+        try {
+            DB::beginTransaction();
+            //? decrement sender balance
+            $senderWallet->decrement('balance', $request->amount);
+
+            //? increment receiver balance
+            $receiverWallet->increment('balance', $request->amount);
+
+            // sender transaction record
+            Transaction::create([
+                'user_id' => $sender->id,
+                'wallet_id' => $senderWallet->id,
+                'amount' => $request->amount,
+                'type' => 'transfer',
+                'status' => 'success',
+                'reference' => "TRF_" . Str::upper(bin2hex(random_bytes(5))),
+                'related_wallet_id' => $receiverWallet->id,
+                'metadata' => [
+                    'to' => $receiverWallet->user_id
+                ]
+            ]);
+
+            // Receiver transaction
+            Transaction::create([
+                'user_id' => $receiverWallet->user_id,
+                'wallet_id' => $receiverWallet->id,
+                'amount' => $request->amount,
+                'type' => 'deposit',
+                'status' => 'success',
+                'reference' => "DEP_" . Str::upper(bin2hex(random_bytes(5))),
+                'related_wallet_id' => $senderWallet->id,
+                'metadata' => [
+                    'from' => $sender->id
+                ]
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Transfer successful',
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            return response()->json([
+                'status' => false,
+                'error' => 'Transfer failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 
     public function depositStatus(Request $request, string $ref)
     {
@@ -229,12 +315,13 @@ class WalletController extends Controller
 
     public function transactionHistory(Request $request)
     {
-        $user = Auth::user();
+        $user = $request->user();
 
         try {
-            $transactions = $user->wallet
+            $transactions = $user
                 ->transactions()
-                ->orderBy('created_at', 'desc')->get();
+                ->latest()
+                ->get();
 
             return response()->json([
                 'status' => true,
