@@ -44,9 +44,5 @@ Route::controller(WalletController::class)->group(function () {
     Route::post('/wallet/transfer', 'transfer')->middleware('auth_or_api_key:transfer');
     Route::get('/wallet/deposit/{reference}/status', 'depositStatus')->middleware('auth_or_api_key:read');
     Route::get('/wallat/transactions', 'transactionHistory')->middleware('auth_or_api_key:read');
+    Route::post('/wallet/paystack/webhook', 'depositCallback')->name('wallet.deposit.callback');
 });
-
-
-// Paystack webhook route
-Route::post('/wallet/paystack/webhook', [WalletController::class, 'depositCallback'])
-    ->name('wallet.deposit.callback');
