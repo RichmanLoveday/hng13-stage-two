@@ -33,6 +33,8 @@ Route::middleware('auth:api')->group(function () {
     Route::controller(ApiKeyController::class)->group(function () {
         Route::post('/keys/create', 'create');
         Route::post('/keys/rollover', 'rollover');
+        Route::put('/keys/revoke', 'revoke');
+        Route::get('/keys', 'list');
     });
 });
 

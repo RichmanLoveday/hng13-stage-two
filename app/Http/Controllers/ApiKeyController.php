@@ -69,10 +69,12 @@ class ApiKeyController extends Controller
                 ->where('user_id', auth()->id())
                 ->firstOrFail();
 
-            if ($expiredKey->expires_at->isFuture()) {
+
+            // dd($expiredKey->revoked);
+            if ($expiredKey->expires_at->isFuture() &&  !$expiredKey->revoked) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'Key has not expired yet'
+                    'message' => 'Key has not expired yet or is not revoked'
                 ], 400);
             }
 
@@ -89,6 +91,52 @@ class ApiKeyController extends Controller
             return response()->json([
                 'api_key' => $plainKey,
                 'expires_at' => $newKey->expires_at
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    public function revoke(Request $request)
+    {
+        try {
+            $request->validate([
+                'key_id' => 'required|exists:api_keys,id'
+            ]);
+
+            $apiKey = ApiKey::where('id', $request->key_id)
+                ->where('user_id', auth()->id())
+                ->firstOrFail();
+
+            $apiKey->revoked = true;
+            $apiKey->save();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'API key revoked successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    public function list(Request $request)
+    {
+        try {
+            $apiKeys = ApiKey::where('user_id', auth()->id())
+                ->get(['id', 'name', 'permissions', 'expires_at', 'revoked', 'created_at']);
+
+            return response()->json([
+                'status' => true,
+                'api_keys' => $apiKeys
             ]);
         } catch (\Exception $e) {
             return response()->json([

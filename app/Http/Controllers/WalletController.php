@@ -299,7 +299,7 @@ class WalletController extends Controller
             }
 
             return response()->json([
-                'status' => true,
+                // 'status' => true,
                 'status' => $transaction->status,
                 'balance' => $transaction->wallet->balance,
                 "reference" => $transaction->reference,
