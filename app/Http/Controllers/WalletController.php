@@ -115,7 +115,6 @@ class WalletController extends Controller
         Log::info('Paystack Webhook Signature', ['signature' => $signature]);
 
 
-
         // handle deposit callback logic
         try {
 
@@ -128,24 +127,26 @@ class WalletController extends Controller
 
             $event = json_decode($payload, true);
 
+            // dd("reached here");
+            $data = $event['data'];
+            $reference = $data['reference'];
+
+            // find the transaction
+            $transaction = Transaction::with('wallet')
+                ->where('reference', $reference)
+                ->where('status', 'pending')
+                ->first();
+
+            if (!$transaction) {
+                return response()->json([
+                    'status' => false,
+                    'error' => 'Transaction not found',
+                ], 404);
+            }
+
+
+            //? check if event is successful
             if ($event['event'] == 'charge.success') {
-                // dd("reached here");
-                $data = $event['data'];
-                $reference = $data['reference'];
-
-                // find the transaction
-                $transaction = Transaction::with('wallet')
-                    ->where('reference', $reference)
-                    ->where('status', 'pending')
-                    ->first();
-
-                if (!$transaction) {
-                    return response()->json([
-                        'status' => false,
-                        'error' => 'Transaction not found',
-                    ], 404);
-                }
-
                 // update wallet balance
                 $wallet = $transaction->wallet;
                 $wallet->balance += $transaction->amount;
@@ -157,38 +158,19 @@ class WalletController extends Controller
 
                 return response()->json([
                     'status' => true,
-                    // 'message' => 'Deposit verified successfully',
+                    'message' => 'Deposit verified successfully',
                     // 'new_balance' => $wallet->balance,
                 ], 200);
             }
 
-
             // if failed transaction status is failed
-            if ($event['event'] == 'charge.failed') {
-                $data = $event['data'];
-                $reference = $data['reference'];
+            $transaction->status = 'failed';
+            $transaction->save();
 
-                // find the transaction
-                $transaction = Transaction::where('reference', $reference)
-                    ->where('status', 'pending')
-                    ->first();
-
-                if (!$transaction) {
-                    return response()->json([
-                        'status' => false,
-                        'error' => 'Transaction not found',
-                    ], 404);
-                }
-
-                // update transaction status
-                $transaction->status = 'failed';
-                $transaction->save();
-
-                return response()->json([
-                    'status' => true,
-                    // 'message' => 'Deposit marked as failed',
-                ], 200);
-            }
+            return response()->json([
+                'status' => true,
+                'message' => 'Deposit verification completed with failed status',
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
